@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// 문항 데이터
+// 문항 데이터 (기존과 동일)
 const questions = {
   step1: {
     title: '📍 [1단계] 초기 문항 (난이도: 중)',
@@ -14,10 +14,10 @@ const questions = {
       '③ 한 번 제출한 답안은 절대 수정할 수 없도록 통제하여 시험의 타당도를 높인다.',
       '④ 총괄평가(Summative Assessment)의 기능을 강화하여 서열화에 최적화되어 있다.',
     ],
-    answer: 1, // 배열 인덱스 (실제 2번)
+    answer: 1,
   },
   step2A: {
-    title: '📈 [2단계-A] 심화 문항 (난이도: 상)',
+    title: '📈[2단계-A] 심화 문항 (난이도: 상)',
     text: 'Q2-A. 차세대 CAT 시스템에서는 단기 탐욕 알고리즘(Greedy Algorithm)의 한계(문항 노출 편중 등)를 극복하기 위해 새로운 기술을 도입했습니다. 다량의 모의고사 시뮬레이션을 통해 장기적인 관점에서 문항 풀의 활용도를 극대화하는 정책(Policy)을 인공지능이 스스로 학습하게 하는 이 알고리즘의 명칭은 무엇입니까?',
     options:[
       '① 마르코프 연쇄 몬테카를로(MCMC)',
@@ -25,10 +25,10 @@ const questions = {
       '③ 이중 심층 Q-러닝(Double Deep Q-learning)',
       '④ 인지진단모형(CDM)',
     ],
-    answer: 2, // 3번
+    answer: 2,
   },
   step2B: {
-    title: '📉 [2단계-B] 기초 문항 (난이도: 하)',
+    title: '📉[2단계-B] 기초 문항 (난이도: 하)',
     text: 'Q2-B. 보고서에 따르면, 기존의 고전검사이론(CTT) 환경에서는 피험자의 능력이 출제된 문항의 평균적인 난이도에 따라 심하게 변동되는 심각한 오류가 발생합니다. 이러한 현상을 무엇이라고 부릅니까?',
     options:[
       '① 집단 종속성 (Sample Dependency)',
@@ -36,7 +36,7 @@ const questions = {
       '③ 블랙박스 현상 (Blackbox)',
       '④ 자동화의 역설 (Paradox of Automation)',
     ],
-    answer: 0, // 1번
+    answer: 0,
   },
   step3: {
     최상: 'Q3-최상. 대규모 언어 모델(LLM)을 활용한 자동 문항 생성(AIG)은 생산성이 높지만 \'환각 현상\'과 \'편향성\'의 위험이 있습니다. 보고서에서는 이를 회피하고 시험의 신뢰성을 담보하기 위해 개발 단계부터 어떤 프레임워크를 의무적으로 채택해야 한다고 주장했습니까? (주관식)',
@@ -47,23 +47,51 @@ const questions = {
 };
 
 export default function CATApp() {
-  const [step, setStep] = useState(0); // 0: 시작, 1: 1단계, 2: 2단계, 3: 3단계, 4: 결과
+  const [step, setStep] = useState(0);
   const [studentName, setStudentName] = useState('');
+  const[entryCodeInput, setEntryCodeInput] = useState(''); // 🔑 학생이 입력한 입장 코드
+  
   const[q1Ans, setQ1Ans] = useState<number | null>(null);
-  const [q2Type, setQ2Type] = useState<'A' | 'B' | null>(null);
-  const [q2Ans, setQ2Ans] = useState<number | null>(null);
-  const [q3Type, setQ3Type] = useState<'최상' | '중상' | '중하' | '최하' | null>(null);
+  const[q2Type, setQ2Type] = useState<'A' | 'B' | null>(null);
+  const[q2Ans, setQ2Ans] = useState<number | null>(null);
+  const[q3Type, setQ3Type] = useState<'최상' | '중상' | '중하' | '최하' | null>(null);
   const [q3Ans, setQ3Ans] = useState('');
-  const[isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // ⚙️ DB에서 가져올 관리자 설정 상태
+  const [settings, setSettings] = useState<{ is_open: boolean; entry_code: string } | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  // 화면이 처음 켜질 때 DB에서 설정을 가져옴
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+
+      if (data) setSettings(data);
+      if (error) console.error('설정 로드 실패:', error);
+      setIsLoadingSettings(false);
+    };
+    fetchSettings();
+  },[]);
+
+  // 평가 시작 버튼 눌렀을 때 검사
+  const handleStart = () => {
+    if (!settings?.is_open) return alert('현재 평가는 마감되었습니다.');
+    if (!studentName.trim()) return alert('이름을 입력해주세요.');
+    if (entryCodeInput !== settings?.entry_code) return alert('입장 코드가 올바르지 않습니다.');
+    
+    setStep(1);
+  };
 
   const handleNextStep1 = () => {
     if (q1Ans === null) return alert('정답을 선택해주세요.');
-    // 1번 문제 정답 확인 (index 1이 2번 보기)
-    if (q1Ans === questions.step1.answer) {
-      setQ2Type('A');
-    } else {
-      setQ2Type('B');
-    }
+    if (q1Ans === questions.step1.answer) setQ2Type('A');
+    else setQ2Type('B');
     setStep(2);
   };
 
@@ -81,13 +109,28 @@ export default function CATApp() {
 
   const handleSubmit = async () => {
     if (!q3Ans.trim()) return alert('답을 입력해주세요.');
+    
+    // 도배 방지
+    if (localStorage.getItem('cat_submitted') === 'true') {
+      alert('이미 평가를 완료하셨습니다. 중복 제출은 불가능합니다.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // 제출 직전에 한 번 더 시험이 열려있는지 DB 확인 (학생이 창을 오래 켜둔 경우 대비)
+      const { data: currentSettings } = await supabase.from('admin_settings').select('is_open').eq('id', 1).single();
+      if (currentSettings && !currentSettings.is_open) {
+        alert('제출이 마감되었습니다.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const { error } = await supabase.from('cat_results').insert([
         {
           student_name: studentName,
-          q1_answer: (q1Ans! + 1).toString(), // 보기 번호로 저장
+          q1_answer: (q1Ans! + 1).toString(),
           q2_type: q2Type,
           q2_answer: (q2Ans! + 1).toString(),
           q3_type: q3Type,
@@ -96,6 +139,8 @@ export default function CATApp() {
       ]);
 
       if (error) throw error;
+      
+      localStorage.setItem('cat_submitted', 'true'); // 제출 완료 도장
       setStep(4);
     } catch (error) {
       console.error(error);
@@ -108,29 +153,54 @@ export default function CATApp() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
-        {step === 0 && (
+        
+        {/* 로딩 중 화면 */}
+        {isLoadingSettings && step === 0 && (
+          <div className="text-center py-10 text-gray-500">시스템 설정을 불러오는 중입니다...</div>
+        )}
+
+        {/* 시작 화면 */}
+        {!isLoadingSettings && step === 0 && (
           <div className="text-center space-y-6">
             <h1 className="text-2xl font-bold text-gray-800">CAT 기반 맞춤형 이해도 평가</h1>
-            <p className="text-gray-600">이름을 입력하고 평가를 시작하세요.</p>
-            <input
-              type="text"
-              placeholder="이름 입력"
-              className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-            />
-            <button
-              onClick={() => {
-                if (!studentName.trim()) alert('이름을 입력해주세요.');
-                else setStep(1);
-              }}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              평가 시작
-            </button>
+            
+            {settings?.is_open ? (
+              <>
+                <p className="text-gray-600">이름과 입장 코드를 입력하고 평가를 시작하세요.</p>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="이름 입력"
+                    className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="입장 코드 입력"
+                    className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    value={entryCodeInput}
+                    onChange={(e) => setEntryCodeInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+                  />
+                </div>
+                <button
+                  onClick={handleStart}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+                >
+                  평가 시작
+                </button>
+              </>
+            ) : (
+              <div className="py-8 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-red-600 font-bold text-lg">🚫 현재 평가가 마감되었습니다.</p>
+                <p className="text-gray-600 mt-2 text-sm">선생님께 문의해주세요.</p>
+              </div>
+            )}
           </div>
         )}
 
+        {/* 1단계 */}
         {step === 1 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600">{questions.step1.title}</h2>
@@ -138,26 +208,18 @@ export default function CATApp() {
             <div className="space-y-3">
               {questions.step1.options.map((opt, idx) => (
                 <label key={idx} className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition">
-                  <input
-                    type="radio"
-                    name="q1"
-                    className="mt-1"
-                    checked={q1Ans === idx}
-                    onChange={() => setQ1Ans(idx)}
-                  />
+                  <input type="radio" name="q1" className="mt-1" checked={q1Ans === idx} onChange={() => setQ1Ans(idx)} />
                   <span className="text-gray-700">{opt}</span>
                 </label>
               ))}
             </div>
-            <button
-              onClick={handleNextStep1}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
+            <button onClick={handleNextStep1} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
               다음 단계로
             </button>
           </div>
         )}
 
+        {/* 2단계 */}
         {step === 2 && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600">
@@ -169,26 +231,18 @@ export default function CATApp() {
             <div className="space-y-3">
               {(q2Type === 'A' ? questions.step2A.options : questions.step2B.options).map((opt, idx) => (
                 <label key={idx} className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition">
-                  <input
-                    type="radio"
-                    name="q2"
-                    className="mt-1"
-                    checked={q2Ans === idx}
-                    onChange={() => setQ2Ans(idx)}
-                  />
+                  <input type="radio" name="q2" className="mt-1" checked={q2Ans === idx} onChange={() => setQ2Ans(idx)} />
                   <span className="text-gray-700">{opt}</span>
                 </label>
               ))}
             </div>
-            <button
-              onClick={handleNextStep2}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
+            <button onClick={handleNextStep2} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
               다음 단계로
             </button>
           </div>
         )}
 
+        {/* 3단계 */}
         {step === 3 && q3Type && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600">🏆 [3단계] 최종 진단 문항 ({q3Type} 난이도)</h2>
@@ -210,6 +264,7 @@ export default function CATApp() {
           </div>
         )}
 
+        {/* 완료 화면 */}
         {step === 4 && (
           <div className="text-center space-y-6">
             <div className="text-6xl">🎉</div>
@@ -218,12 +273,6 @@ export default function CATApp() {
               {studentName} 학생의 최종 도달 레벨은 <span className="font-bold text-blue-600">[{q3Type}]</span> 입니다.
             </p>
             <p className="text-sm text-gray-500">결과가 성공적으로 저장되었습니다.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition"
-            >
-              처음으로 돌아가기
-            </button>
           </div>
         )}
       </div>
