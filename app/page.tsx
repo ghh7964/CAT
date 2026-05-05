@@ -214,7 +214,7 @@ export default function CATApp() {
             ) : (
               <div className="py-8 bg-red-50 rounded-lg border border-red-200">
                 <p className="text-red-600 font-bold text-lg">🚫 현재 평가가 마감되었습니다.</p>
-                <p className="text-gray-600 mt-2 text-sm">선생님께 문의해주세요.</p>
+                <p className="text-gray-600 mt-2 text-sm">운영자에게 문의해주세요.</p>
               </div>
             )}
           </div>
