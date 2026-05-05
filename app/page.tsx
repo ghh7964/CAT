@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// 문항 데이터 (기존과 동일)
+// 문항 데이터
 const questions = {
   step1: {
     title: '📍 [1단계] 초기 문항 (난이도: 중)',
@@ -49,7 +49,7 @@ const questions = {
 export default function CATApp() {
   const[step, setStep] = useState(0);
   const [studentName, setStudentName] = useState('');
-  const [entryCodeInput, setEntryCodeInput] = useState('');
+  const[entryCodeInput, setEntryCodeInput] = useState('');
   
   const[q1Ans, setQ1Ans] = useState<number | null>(null);
   const[q2Type, setQ2Type] = useState<'A' | 'B' | null>(null);
@@ -57,7 +57,7 @@ export default function CATApp() {
   const[q3Type, setQ3Type] = useState<'최상' | '중상' | '중하' | '최하' | null>(null);
   const [q3Ans, setQ3Ans] = useState('');
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const[isSubmitting, setIsSubmitting] = useState(false);
   const[isCheckingCode, setIsCheckingCode] = useState(false);
   
   const [settings, setSettings] = useState<{ is_open: boolean } | null>(null);
@@ -72,7 +72,7 @@ export default function CATApp() {
     fetchSettings();
   },[]);
 
-  // 🚀 평가 시작 전 코드 검증 로직
+  // 🚀 평가 시작 전 코드 검증 로직 (입구 컷 완벽 적용)
   const handleStart = async () => {
     if (!settings?.is_open) return alert('현재 평가는 마감되었습니다.');
     if (!studentName.trim()) return alert('이름을 입력해주세요.');
@@ -81,7 +81,7 @@ export default function CATApp() {
     setIsCheckingCode(true);
 
     try {
-      // 1. 선생님이 발급한 유효한 코드인지 확인 (valid_codes 테이블)
+      // 1. 선생님이 발급한 유효한 코드인지 확인
       const { data: validCode } = await supabase
         .from('valid_codes')
         .select('code')
@@ -94,8 +94,8 @@ export default function CATApp() {
         return;
       }
 
-      // 2. 🌟 수정된 부분: 안전한 함수(RPC)를 호출해서 사용 여부만 딱 확인하기
-      const { data: isUsed, error: rpcError } = await supabase.rpc('check_code_used', { 
+      // 2. 안전한 함수(RPC)를 호출해서 이미 사용된 코드인지 입구에서 확인
+      const { data: isUsed } = await supabase.rpc('check_code_used', { 
         input_code: entryCodeInput 
       });
 
@@ -139,11 +139,10 @@ export default function CATApp() {
     setIsSubmitting(true);
 
     try {
-      // DB에 결과 저장 (access_code 포함)
       const { error } = await supabase.from('cat_results').insert([
         {
           student_name: studentName,
-          access_code: entryCodeInput, // 🔑 사용한 코드 기록
+          access_code: entryCodeInput,
           q1_answer: (q1Ans! + 1).toString(),
           q2_type: q2Type,
           q2_answer: (q2Ans! + 1).toString(),
@@ -152,11 +151,10 @@ export default function CATApp() {
         },
       ]);
 
-      // 🛑 DB의 UNIQUE 제약 조건에 걸렸을 경우 (동시 제출 등 완벽 차단)
       if (error) {
-        if (error.code === '23505') { // PostgreSQL의 고유 위반 에러 코드
+        if (error.code === '23505') {
           alert('이미 제출이 완료된 코드입니다. 중복 제출은 불가능합니다.');
-          window.location.reload(); // 강제 새로고침으로 쫓아냄
+          window.location.reload();
           return;
         }
         throw error;
@@ -195,6 +193,7 @@ export default function CATApp() {
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                   />
+                  {/* 🌟 type="text"로 변경하여 글자가 보이게 하고, 대문자로 자동 변환 */}
                   <input
                     type="text"
                     placeholder="입장 코드 입력 (예: CODE-001)"
@@ -293,7 +292,12 @@ export default function CATApp() {
             <p className="text-gray-600">
               {studentName} 학생의 최종 도달 레벨은 <span className="font-bold text-blue-600">[{q3Type}]</span> 입니다.
             </p>
-            <p className="text-sm text-gray-500">결과가 성공적으로 저장되었습니다. 창을 닫으셔도 됩니다.</p>
+            {/* 🌟 완료 화면에 사용한 코드 표시 */}
+            <div className="bg-gray-100 p-4 rounded-lg inline-block mt-4">
+              <p className="text-sm text-gray-500">사용된 입장 코드</p>
+              <p className="font-mono font-bold text-gray-700 tracking-wider">{entryCodeInput}</p>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">결과가 성공적으로 저장되었습니다. 창을 닫으셔도 됩니다.</p>
           </div>
         )}
       </div>
