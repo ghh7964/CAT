@@ -81,7 +81,7 @@ export default function CATApp() {
     setIsCheckingCode(true);
 
     try {
-      // 1. 선생님이 발급한 유효한 코드인지 확인
+      // 1. 선생님이 발급한 유효한 코드인지 확인 (valid_codes 테이블)
       const { data: validCode } = await supabase
         .from('valid_codes')
         .select('code')
@@ -94,13 +94,12 @@ export default function CATApp() {
         return;
       }
 
-      // 2. 이미 누군가(혹은 본인이) 제출에 사용한 코드인지 확인
-      const { data: usedCode } = await supabase
-        .from('cat_results')
-        .select('access_code')
-        .eq('access_code', entryCodeInput);
+      // 2. 🌟 수정된 부분: 안전한 함수(RPC)를 호출해서 사용 여부만 딱 확인하기
+      const { data: isUsed, error: rpcError } = await supabase.rpc('check_code_used', { 
+        input_code: entryCodeInput 
+      });
 
-      if (usedCode && usedCode.length > 0) {
+      if (isUsed) {
         alert('이미 평가 제출이 완료된 코드입니다. (중복 참여 불가)');
         setIsCheckingCode(false);
         return;
