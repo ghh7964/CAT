@@ -47,9 +47,9 @@ const questions = {
 };
 
 export default function CATApp() {
-  const [step, setStep] = useState(0);
+  const[step, setStep] = useState(0);
   const [studentName, setStudentName] = useState('');
-  const[entryCodeInput, setEntryCodeInput] = useState(''); // 🔑 학생이 입력한 입장 코드
+  const [entryCodeInput, setEntryCodeInput] = useState('');
   
   const[q1Ans, setQ1Ans] = useState<number | null>(null);
   const[q2Type, setQ2Type] = useState<'A' | 'B' | null>(null);
@@ -58,34 +58,62 @@ export default function CATApp() {
   const [q3Ans, setQ3Ans] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const[isCheckingCode, setIsCheckingCode] = useState(false);
   
-  // ⚙️ DB에서 가져올 관리자 설정 상태
-  const [settings, setSettings] = useState<{ is_open: boolean; entry_code: string } | null>(null);
+  const [settings, setSettings] = useState<{ is_open: boolean } | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
-  // 화면이 처음 켜질 때 DB에서 설정을 가져옴
   useEffect(() => {
     const fetchSettings = async () => {
-      const { data, error } = await supabase
-        .from('admin_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-
+      const { data } = await supabase.from('admin_settings').select('is_open').eq('id', 1).single();
       if (data) setSettings(data);
-      if (error) console.error('설정 로드 실패:', error);
       setIsLoadingSettings(false);
     };
     fetchSettings();
   },[]);
 
-  // 평가 시작 버튼 눌렀을 때 검사
-  const handleStart = () => {
+  // 🚀 평가 시작 전 코드 검증 로직
+  const handleStart = async () => {
     if (!settings?.is_open) return alert('현재 평가는 마감되었습니다.');
     if (!studentName.trim()) return alert('이름을 입력해주세요.');
-    if (entryCodeInput !== settings?.entry_code) return alert('입장 코드가 올바르지 않습니다.');
-    
-    setStep(1);
+    if (!entryCodeInput.trim()) return alert('개별 입장 코드를 입력해주세요.');
+
+    setIsCheckingCode(true);
+
+    try {
+      // 1. 선생님이 발급한 유효한 코드인지 확인
+      const { data: validCode } = await supabase
+        .from('valid_codes')
+        .select('code')
+        .eq('code', entryCodeInput)
+        .single();
+
+      if (!validCode) {
+        alert('존재하지 않거나 잘못된 입장 코드입니다.');
+        setIsCheckingCode(false);
+        return;
+      }
+
+      // 2. 이미 누군가(혹은 본인이) 제출에 사용한 코드인지 확인
+      const { data: usedCode } = await supabase
+        .from('cat_results')
+        .select('access_code')
+        .eq('access_code', entryCodeInput);
+
+      if (usedCode && usedCode.length > 0) {
+        alert('이미 평가 제출이 완료된 코드입니다. (중복 참여 불가)');
+        setIsCheckingCode(false);
+        return;
+      }
+
+      // 모든 검증 통과 시 1단계로 이동
+      setStep(1);
+    } catch (error) {
+      console.error(error);
+      alert('코드 확인 중 오류가 발생했습니다.');
+    } finally {
+      setIsCheckingCode(false);
+    }
   };
 
   const handleNextStep1 = () => {
@@ -109,27 +137,14 @@ export default function CATApp() {
 
   const handleSubmit = async () => {
     if (!q3Ans.trim()) return alert('답을 입력해주세요.');
-    
-    // 도배 방지
-    if (localStorage.getItem('cat_submitted') === 'true') {
-      alert('이미 평가를 완료하셨습니다. 중복 제출은 불가능합니다.');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      // 제출 직전에 한 번 더 시험이 열려있는지 DB 확인 (학생이 창을 오래 켜둔 경우 대비)
-      const { data: currentSettings } = await supabase.from('admin_settings').select('is_open').eq('id', 1).single();
-      if (currentSettings && !currentSettings.is_open) {
-        alert('제출이 마감되었습니다.');
-        setIsSubmitting(false);
-        return;
-      }
-
+      // DB에 결과 저장 (access_code 포함)
       const { error } = await supabase.from('cat_results').insert([
         {
           student_name: studentName,
+          access_code: entryCodeInput, // 🔑 사용한 코드 기록
           q1_answer: (q1Ans! + 1).toString(),
           q2_type: q2Type,
           q2_answer: (q2Ans! + 1).toString(),
@@ -138,9 +153,16 @@ export default function CATApp() {
         },
       ]);
 
-      if (error) throw error;
+      // 🛑 DB의 UNIQUE 제약 조건에 걸렸을 경우 (동시 제출 등 완벽 차단)
+      if (error) {
+        if (error.code === '23505') { // PostgreSQL의 고유 위반 에러 코드
+          alert('이미 제출이 완료된 코드입니다. 중복 제출은 불가능합니다.');
+          window.location.reload(); // 강제 새로고침으로 쫓아냄
+          return;
+        }
+        throw error;
+      }
       
-      localStorage.setItem('cat_submitted', 'true'); // 제출 완료 도장
       setStep(4);
     } catch (error) {
       console.error(error);
@@ -154,7 +176,6 @@ export default function CATApp() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
         
-        {/* 로딩 중 화면 */}
         {isLoadingSettings && step === 0 && (
           <div className="text-center py-10 text-gray-500">시스템 설정을 불러오는 중입니다...</div>
         )}
@@ -166,29 +187,30 @@ export default function CATApp() {
             
             {settings?.is_open ? (
               <>
-                <p className="text-gray-600">이름과 입장 코드를 입력하고 평가를 시작하세요.</p>
+                <p className="text-gray-600">이름과 부여받은 <span className="font-bold text-blue-600">개별 입장 코드</span>를 입력하세요.</p>
                 <div className="space-y-3">
                   <input
                     type="text"
-                    placeholder="이름 입력"
+                    placeholder="이름 입력 (예: 홍길동)"
                     className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                   />
                   <input
-                    type="password"
-                    placeholder="입장 코드 입력"
-                    className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    type="text"
+                    placeholder="입장 코드 입력 (예: CODE-001)"
+                    className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                     value={entryCodeInput}
-                    onChange={(e) => setEntryCodeInput(e.target.value)}
+                    onChange={(e) => setEntryCodeInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => e.key === 'Enter' && handleStart()}
                   />
                 </div>
                 <button
                   onClick={handleStart}
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+                  disabled={isCheckingCode}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
                 >
-                  평가 시작
+                  {isCheckingCode ? '코드 확인 중...' : '평가 시작'}
                 </button>
               </>
             ) : (
@@ -272,7 +294,7 @@ export default function CATApp() {
             <p className="text-gray-600">
               {studentName} 학생의 최종 도달 레벨은 <span className="font-bold text-blue-600">[{q3Type}]</span> 입니다.
             </p>
-            <p className="text-sm text-gray-500">결과가 성공적으로 저장되었습니다.</p>
+            <p className="text-sm text-gray-500">결과가 성공적으로 저장되었습니다. 창을 닫으셔도 됩니다.</p>
           </div>
         )}
       </div>
