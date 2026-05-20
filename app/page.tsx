@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { verifyAnswer } from './actions'; // 👈 서버 액션 불러오기
+import { verifyAnswer } from './actions';
 
-// 📚 문항 데이터
+// 📚 문항 데이터 (원본 텍스트 그대로 반영, 정답은 백엔드에 있음)
 const questions = {
   1: {
     2: {
-      title: '📍 [단원 1] 초기 진단 (난이도: 중)',
-      text: 'Q1. 현행 CBT(컴퓨터 기반 평가)가 가진 고정형 문항 제시 방식의 한계점으로 보기 어려운 것은?',
+      title: '1. 기존 평가 문제 (수정 완료)',
+      text: '2. 현행 CBT(컴퓨터 기반 평가)가 가진 고정형 문항 제시 방식의 한계점으로 보기 어려운 것은? (난이도: 중)',
       options: [
         '① 모든 학생에게 동일한 문항 세트를 제공하므로 측정의 비효율성이 발생한다.',
         '② 학생의 수준을 고려하지 못한 문항은 학습자에게 좌절감을 줄 수 있다.',
@@ -20,8 +20,8 @@ const questions = {
   },
   2: {
     3: {
-      title: '📈 [단원 2] 심화 (난이도: 상)',
-      text: 'Q2. CAT의 기본 진행 과정으로 시작 문항 제시 다음 가장 적절한 것은?',
+      title: '2. CAT 원리 (수정 완료)',
+      text: '[상] CAT의 기본 진행 과정으로 시작 문항 제시 다음 가장 적절한 것은?',
       options: [
         '① 응답 → 최적 문항 선택 및 제시 → 능력모수 추정 → 종료 규칙 확인',
         '② 응답 → 능력모수 추정 → 종료 규칙 확인 → 최적 문항 선택 및 제시',
@@ -30,8 +30,8 @@ const questions = {
       ],
     },
     1: {
-      title: '📉 [단원 2] 기초 (난이도: 하)',
-      text: 'Q2. CAT 시스템을 구동하기 위한 5가지 필수 구성요소에 해당하지 않는 것은?',
+      title: '2. CAT 원리 (수정 완료)',
+      text: '[하] CAT 시스템을 구동하기 위한 5가지 필수 구성요소에 해당하지 않는 것은?',
       options: [
         '① 어떤 기준으로 검사를 마칠지 결정하는 종료 규칙',
         '② 응답 결과에 따라 문항을 선택하는 문항 선정 방법',
@@ -42,8 +42,8 @@ const questions = {
   },
   3: {
     3: {
-      title: '🔥 [단원 3] 심화 적용 (난이도: 상)',
-      text: 'Q3. 박현 외(2026)의 \'교양 영어 CAT 진단 시스템\' 연구에 대한 설명 및 결과로 옳은 것은?',
+      title: '3. 적용 가능성과 방안 (수정 완료)',
+      text: '11. 박현 외(2026)의 \'교양 영어 CAT 진단 시스템\' 연구에 대한 설명 및 결과로 옳은 것은? (상)',
       options: [
         '① 대학생의 영어 기초학력을 진단하기 위해 연구진이 자체적으로 신규 개발한 100개의 문항을 활용하여 문항은행을 구축하였다.',
         '② 듣기 영역에서는 CAT 실시 집단이 비실시 집단보다 더 큰 향상을 보였으며, 읽기 영역에서는 CAT 실시 집단에서만 유의미한 향상이 나타났다.',
@@ -52,8 +52,8 @@ const questions = {
       ],
     },
     2: {
-      title: '🎯 [단원 3] 일반 적용 (난이도: 중)',
-      text: 'Q3. 기초학력진단평가에서 CAT(컴퓨터 적응형 평가)가 제공하는 \'진단적 유용성\'을 가장 잘 설명한 사례는?',
+      title: '3. 적용 가능성과 방안 (수정 완료)',
+      text: '문항 6. 기초학력진단평가에서 CAT(컴퓨터 적응형 평가)가 제공하는 \'진단적 유용성\'을 가장 잘 설명한 사례는? (중)',
       options: [
         '① 학생이 특정 문항에서 오답을 낼 경우, 정답을 맞힐 때까지 동일한 난이도의 유사 문항을 반복 제시하여 해당 개념을 암기하도록 유도했다.',
         '② 학생이 분수 연산 문항을 틀리자, 하위 개념인 통분이나 약분 문항을 이어서 제시하여 학습 결손이 발생한 정확한 위치를 파악했다.',
@@ -62,8 +62,8 @@ const questions = {
       ],
     },
     1: {
-      title: '🌱 [단원 3] 기초 적용 (난이도: 하)',
-      text: 'Q3. 다음 중 한국 교육 환경에서 CAT(컴퓨터 적응형 평가)를 도입할 때 가장 적절한 활용 분야는?',
+      title: '3. 적용 가능성과 방안 (수정 완료)',
+      text: '1. 다음 중 한국 교육 환경에서 CAT(컴퓨터 적응형 평가)를 도입할 때 가장 적절한 활용 분야는? (난이도: 하)',
       options: [
         '① 학생들의 서열을 엄격하게 나누는 내신 지필 평가',
         '② 학생의 현재 수준을 진단하고 보충 학습으로 연결하는 맞춤형 진단 평가',
@@ -74,18 +74,18 @@ const questions = {
   },
   4: {
     3: {
-      title: '👑 [단원 4] 최종 심화 (난이도: 상)',
-      text: 'Q4. 베이즈 정리 등을 활용한 매우 정교하고 복잡한 다차원 CAT 알고리즘(MCMC 시뮬레이션 등)은 그 계산량이 너무 방대하여 실시간 온라인 평가 도중 응답 지연을 일으키는 한계가 있었다. 이 연산 속도 한계의 해결 방안은 무엇인가?',
+      title: '4. 한계 및 해결방안 (수정 완료)',
+      text: '문항 18. 베이즈 정리 등을 활용한 매우 정교하고 복잡한 다차원 CAT 알고리즘(MCMC 시뮬레이션 등)은 그 계산량이 너무 방대하여 실시간 온라인 평가 도중 응답 지연을 일으키는 한계가 있었다. 이 연산 속도 한계의 해결 방안은 무엇인가?(상)',
       options: [
         '① MCMC 연산의 수렴성 판단 기준을 대폭 완화하여, 최소한의 반복 계산만 수행한 후 조기에 연산을 종료시킨다.',
         '② MCMC의 반복적인 시뮬레이션 과정을 거치지 않고, 사후 분포의 수학적 특성을 활용해 표본을 즉각 추출하는 직접 샘플링 알고리즘을 도입한다.',
-        '③ 복잡한 통계적 수치 연산 과정을 생략하기 위해, 사전 학습된 대규모 언어 모델(LLM)에 학습자의 정오답 패턴을 입력하여 다음 적정 문항과 능력치를 실시간 추론하게 한다.',
+        '③ 복잡한 통계적 수치 연산 과정을 생략하기 위해, 사전 학습된 대규모 언어 모델(LLM)에 학습자의 정오답 패턴을 입력하여 다음 적정 문항과 능력치를 실시간으로 추론하게 한다.',
         '④ 다차원 잠재 특성 간의 상관관계를 무시하고 각 차원을 독립적인 단일 차원으로 간주하여, 개별 차원별로 독립된 단일차원 CAT 알고리즘을 병렬 구동한다.'
       ],
     },
     2: {
-      title: '⚖️ [단원 4] 최종 일반 (난이도: 중)',
-      text: 'Q4. 순수 CAT 방식에서 응시자가 느끼는 이전 문항으로 돌아갈 수 없는 불안감을 해결하기 위해 도입할 수 있는 시스템 구조는?',
+      title: '4. 한계 및 해결방안 (수정 완료)',
+      text: '14. 순수 CAT 방식에서 응시자가 느끼는 이전 문항으로 돌아갈 수 없는 불안감을 해결하기 위해 도입할 수 있는 시스템 구조는? (중)',
       options: [
         '① 최대우도추정법(MLE) 기반 정밀 산출 시스템',
         '② 실시간 중요도 샘플링(Importance Sampling) 프레임워크',
@@ -94,13 +94,13 @@ const questions = {
       ],
     },
     1: {
-      title: '🧩 [단원 4] 최종 기초 (난이도: 하)',
-      text: 'Q4. CAT에서 특정 문항이 너무 자주 출제되어 보안 문제가 생길 수 있는 한계를 줄이기 위한 방안으로 가장 적절한 것은?',
+      title: '4. 한계 및 해결방안 (수정 완료)',
+      text: '11.[하] CAT에서 특정 문항이 너무 자주 출제되어 보안 문제가 생길 수 있는 한계를 줄이기 위한 방안으로 가장 적절한 것은?',
       options: [
         '① 문항 선택 과정에서 문항 노출을 제어한다',
         '② 문항은행의 규모를 줄인다',
         '③ 이전 문항 수정 기능을 없앤다',
-        '④ 결과표 제공 속도를 높인다'
+        '④결과표 제공 속도를 높인다'
       ],
     }
   }
@@ -118,7 +118,7 @@ export default function CATApp() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
-  const [isCheckingAnswer, setIsCheckingAnswer] = useState(false); // 👈 채점 중 로딩 상태 추가
+  const [isCheckingAnswer, setIsCheckingAnswer] = useState(false);
   
   const [settings, setSettings] = useState<{ is_open: boolean } | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -160,14 +160,12 @@ export default function CATApp() {
     }
   };
 
-  // 🚀 백엔드(서버 액션)를 통한 안전한 채점 로직
   const handleNext = async () => {
     if (selectedAns === null) return alert('정답을 선택해주세요.');
 
-    setIsCheckingAnswer(true); // 채점 중 버튼 비활성화
+    setIsCheckingAnswer(true);
 
     try {
-      // 🔒 서버에 "몇 단원, 몇 레벨, 몇 번 선택했는지"만 보내서 채점 결과를 받아옴
       const { isCorrect, earnedScore } = await verifyAnswer(step, currentLevel, selectedAns);
 
       const newTotalScore = totalScore + earnedScore;
@@ -298,7 +296,7 @@ export default function CATApp() {
                     className="mt-1" 
                     checked={selectedAns === idx} 
                     onChange={() => setSelectedAns(idx)} 
-                    disabled={isCheckingAnswer || isSubmitting} // 채점 중 조작 방지
+                    disabled={isCheckingAnswer || isSubmitting}
                   />
                   <span className="text-gray-700">{opt}</span>
                 </label>
